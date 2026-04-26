@@ -6,7 +6,7 @@ import time
 
 from telegram import Bot
 from telegram.error import NetworkError, TelegramError
-from telegram.ext import Application
+from telegram.ext import Application, ContextTypes
 from telegram.request import HTTPXRequest
 
 from bot.config import Settings, load_settings
@@ -52,18 +52,40 @@ async def verify_telegram_connectivity(token: str, request: HTTPXRequest, logger
             await bot.shutdown()
 
 
+async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
+    logging.getLogger(__name__).exception("Unhandled update error", exc_info=context.error)
+
+
 def create_application(settings: Settings, db: Database, request: HTTPXRequest) -> Application:
     app = Application.builder().token(settings.bot_token).request(request).build()
     app.bot_data["db"] = db
     app.bot_data["owner_id"] = settings.owner_telegram_id
+    app.bot_data["max_warns"] = settings.max_warns
+    app.bot_data["default_language"] = settings.default_language
 
     register_handlers(app)
+    app.add_error_handler(on_error)
 
     async def post_init(application: Application) -> None:
         await application.bot.set_my_commands(VISIBLE_COMMANDS)
 
     app.post_init = post_init
     return app
+
+
+def ensure_startup_event_loop() -> None:
+    """Ensure a current event loop exists for libraries using get_event_loop()."""
+    asyncio.set_event_loop(asyncio.new_event_loop())
+
+
+def run_connectivity_check(token: str, request: HTTPXRequest, logger: logging.Logger) -> None:
+    """Run async connectivity check using an explicitly managed event loop (Py3.11 safe)."""
+    loop = asyncio.new_event_loop()
+    try:
+        loop.run_until_complete(verify_telegram_connectivity(token, request, logger))
+    finally:
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()
 
 
 def run_bot_forever(settings: Settings) -> None:
@@ -75,7 +97,9 @@ def run_bot_forever(settings: Settings) -> None:
         request = build_request()
 
         try:
-            asyncio.run(verify_telegram_connectivity(settings.bot_token, request, logger))
+            run_connectivity_check(settings.bot_token, request, logger)
+            ensure_startup_event_loop()
+
             app = create_application(settings, db, request)
             logger.info("Starting polling loop")
             app.run_polling(drop_pending_updates=True, bootstrap_retries=5)

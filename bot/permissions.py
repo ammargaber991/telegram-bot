@@ -12,24 +12,70 @@ HandlerFn = Callable[[Update, ContextTypes.DEFAULT_TYPE], Awaitable[None]]
 
 
 COMMAND_MIN_RANK: dict[str, Rank] = {
-    "start": Rank.USER,
-    "help": Rank.USER,
-    "rank": Rank.USER,
+    "start": Rank.MEMBER,
+    "help": Rank.MEMBER,
+    "info": Rank.MEMBER,
+    "rank": Rank.MEMBER,
+    "tag": Rank.MEMBER,
+    "mytag": Rank.MEMBER,
+    "myperms": Rank.MEMBER,
     "whois": Rank.MODERATOR,
-    "dl_status": Rank.MODERATOR,
-    "promote": Rank.ADMIN,
-    "demote": Rank.ADMIN,
-    "broadcast": Rank.ADMIN,
-    "logs": Rank.DEVELOPER,
-    "dev_stats": Rank.DEVELOPER,
-    "dev_note": Rank.DEVELOPER,
+    "panel": Rank.MODERATOR,
+    "stats": Rank.MODERATOR,
+    "top": Rank.MODERATOR,
+    "activity": Rank.MODERATOR,
+    "logs": Rank.MODERATOR,
+    "ban": Rank.MODERATOR,
+    "unban": Rank.MODERATOR,
+    "mute": Rank.MODERATOR,
+    "unmute": Rank.MODERATOR,
+    "warn": Rank.MODERATOR,
+    "unwarn": Rank.MODERATOR,
+    "warns": Rank.MODERATOR,
+    "kick": Rank.MODERATOR,
+    "purge": Rank.MODERATOR,
+    "clean": Rank.MODERATOR,
+    "lock": Rank.MODERATOR,
+    "unlock": Rank.MODERATOR,
+    "tempmute": Rank.MODERATOR,
+    "tempban": Rank.MODERATOR,
+    "filter": Rank.MODERATOR,
+    "settag": Rank.ADMIN,
+    "deltag": Rank.ADMIN,
+    "tags": Rank.ADMIN,
+    "grant": Rank.SUPERADMIN,
+    "revoke": Rank.SUPERADMIN,
+    "perms": Rank.SUPERADMIN,
+    "setwelcome": Rank.ADMIN,
+    "setwarnmsg": Rank.ADMIN,
+    "setmutemsg": Rank.ADMIN,
+    "setbanmsg": Rank.ADMIN,
+    "setcode": Rank.SUPERADMIN,
+    "promote": Rank.SUPERADMIN,
+    "demote": Rank.SUPERADMIN,
+    "admin": Rank.SUPERADMIN,
+    "unadmin": Rank.SUPERADMIN,
+    "vip": Rank.ADMIN,
+    "unvip": Rank.ADMIN,
+    "reset": Rank.ADMIN,
+    "replace": Rank.ADMIN,
+    "say": Rank.MODERATOR,
+    "reply": Rank.MODERATOR,
+    "add": Rank.MODERATOR,
+    "del": Rank.MODERATOR,
+    "list": Rank.MODERATOR,
+    "allow": Rank.MODERATOR,
+    "unallow": Rank.MODERATOR,
+    "broadcast": Rank.SUPERADMIN,
+    "backup": Rank.OWNER,
+    "restart": Rank.OWNER,
 }
 
 
 def _current_rank(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Rank:
     user = update.effective_user
     if user is None:
-        return Rank.USER
+        return Rank.MEMBER
 
     db = context.application.bot_data.get("db")
     owner_id = context.application.bot_data.get("owner_id")
@@ -37,9 +83,9 @@ def _current_rank(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Rank:
         rank = Rank.OWNER
     elif db is not None:
         record = db.get_user(user.id)
-        rank = record.rank if record else Rank.USER
+        rank = record.rank if record else Rank.MEMBER
     else:
-        rank = Rank.USER
+        rank = Rank.MEMBER
 
     context.chat_data["rank"] = rank
     return rank
@@ -52,10 +98,15 @@ def require_rank(required: Rank) -> Callable[[HandlerFn], HandlerFn]:
             user_rank = _current_rank(update, context)
             if user_rank < required:
                 if update.effective_message:
-                    await update.effective_message.reply_text("⛔ Permission denied.")
+                    await update.effective_message.reply_text("⛔ Permission denied | لا تملك الصلاحية")
                 return
             await func(update, context)
 
         return wrapper
 
     return decorator
+
+
+def has_custom_permission(context: ContextTypes.DEFAULT_TYPE, user_id: int, perm: str) -> bool:
+    db = context.application.bot_data.get("db")
+    return bool(db and db.has_permission(user_id, perm))

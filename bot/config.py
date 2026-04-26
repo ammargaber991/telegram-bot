@@ -12,6 +12,17 @@ class Settings:
     owner_telegram_id: int
     database_path: str
     log_level: str
+    default_language: str
+    max_warns: int
+
+
+
+def _int_env(name: str, default: int) -> int:
+    raw = os.getenv(name, str(default)).strip()
+    try:
+        return int(raw)
+    except ValueError as exc:
+        raise RuntimeError(f"{name} must be numeric") from exc
 
 
 
@@ -22,6 +33,8 @@ def load_settings() -> Settings:
     owner_raw = os.getenv("OWNER_TELEGRAM_ID", "").strip() or os.getenv("OWNER_ID", "").strip()
     database_path = os.getenv("DATABASE_PATH", "./design_lab_bot.db").strip()
     log_level = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+    default_language = os.getenv("DEFAULT_LANGUAGE", "ar_en").strip().lower() or "ar_en"
+    max_warns = _int_env("MAX_WARNS", 3)
 
     if not bot_token:
         raise RuntimeError("Missing BOT_TOKEN environment variable")
@@ -38,4 +51,6 @@ def load_settings() -> Settings:
         owner_telegram_id=owner_telegram_id,
         database_path=database_path,
         log_level=log_level,
+        default_language=default_language,
+        max_warns=max_warns,
     )
